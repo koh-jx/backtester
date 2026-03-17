@@ -1,7 +1,7 @@
 from data_retrieval import data_retrieval
 from data_retrieval import returns_adj
 from portfolio import generate_portfolio_from_csv as portf_gen
-from portfolio.const_cols import PNL, RETURNS, TICKER, DATE, WEIGHT, DOLLARS
+from portfolio.const_cols import PNL, RETURNS, TICKER, DATE, WEIGHT, DOLLARS, PRICE, NB_SHARES, DIVIDEND_AMT
 import pandas as pd
 from typing import Union, List, Dict
 import datetime
@@ -20,7 +20,6 @@ def preprocess(data: pd.DataFrame, start_date: str, end_date: str, buffer=5) -> 
     retrieval_start_date = utils_cal.add_bdays(start_date, -buffer)
     retrieval_end_date = utils_cal.add_bdays(end_date, buffer)
     data = data_retrieval.retrieve_data_from_yfin(all_tickers, retrieval_start_date, retrieval_end_date)
-
     data_with_returns = returns_adj.add_returns(data)
 
     data_with_returns = data_with_returns.loc[data_with_returns[DATE].between(start_date, end_date)]
@@ -28,11 +27,15 @@ def preprocess(data: pd.DataFrame, start_date: str, end_date: str, buffer=5) -> 
 
 
 def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str, end_date: str, buffer=5, export_to_csv=True) -> pd.DataFrame:
+
+    # Extend start date ahead by 1 bday so we get the pricing data even after we shift(1).
+    actual_start_date = start_date
+    start_date = utils_cal.add_bdays(start_date, -1)
     
     portfolio_df = portf_gen.get_portfolio(source_portfolio)
     price_and_ret_data = preprocess(portfolio_df, start_date, end_date, buffer)
 
-    data_with_returns = portfolio_df.merge(price_and_ret_data, on=TICKER, how='left')
+    data_with_returns = portfolio_df.merge(price_and_ret_data, on=TICKER, how='left')  # TODO Need to merge by Date as well (after adding date info to portf_gen)
     data_with_returns = data_with_returns.sort_values(by=[TICKER, DATE])
     data_with_returns[RETURNS] = data_with_returns[RETURNS].fillna(0)
 
@@ -50,6 +53,12 @@ def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str,
     data_with_returns[PNL] = data_with_returns['SODDollars'] * data_with_returns[RETURNS]
     data_with_returns['EODDollars'] = data_with_returns['SODDollars'] + data_with_returns[PNL]
 
+    data_with_returns['PrevClose'] = data_with_returns.groupby(TICKER)[PRICE].shift(1)
+    data_with_returns[NB_SHARES] = data_with_returns['SODDollars'] / data_with_returns['PrevClose']
+    data_with_returns['DividendPayout'] = data_with_returns[DIVIDEND_AMT] * data_with_returns[NB_SHARES]
+
+    data_with_returns[PNL] += data_with_returns['DividendPayout']
+
     # (Optional sanity: should equal initial * CumReturns)
     data_with_returns['EOD_check'] = (
         data_with_returns.groupby(TICKER)['Dollars'].transform('first')
@@ -57,8 +66,9 @@ def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str,
     )
 
     # --- Final output ---
+    data_with_returns = data_with_returns.loc[data_with_returns[DATE].between(actual_start_date, end_date)]
     result = data_with_returns[
-        [DATE, TICKER, DOLLARS, RETURNS, PNL, 'CumReturns', 'SODDollars', 'EODDollars', 'EOD_check']
+        [DATE, TICKER, PRICE, DOLLARS, RETURNS, NB_SHARES, DIVIDEND_AMT, 'DividendPayout', PNL, 'CumReturns', 'SODDollars', 'EODDollars', 'EOD_check']
     ]
 
     if export_to_csv:
@@ -68,8 +78,8 @@ def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str,
 
 
 if __name__ == "__main__":
-    tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN']
-    weights = [0.5, 0.1, 0.2, 0.1, 0.1]
+    tickers = ['AAPL']
+    weights = [1.0]
     portfolio = {TICKER: tickers, WEIGHT: weights}
     start_date = datetime.datetime(2026, 1, 1)
     end_date = datetime.datetime(2026, 3, 15)

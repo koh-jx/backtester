@@ -53,8 +53,6 @@ def get_portfolio(source_portfolio: Union[List[str], str, Dict], default_total_d
             logger.info("Neither Weight nor Dollars column found; creating equally-weighted portfolio")
             portfolio_df[DOLLARS] = default_total_dollar_amount / len(portfolio_df)
 
-
-
     assert TICKER in portfolio_df.columns, portfolio_df.columns
     portfolio_df[TICKER] = portfolio_df[TICKER].str.upper()  # Ensure tickers are uppercase
     return portfolio_df

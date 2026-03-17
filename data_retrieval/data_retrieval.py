@@ -10,7 +10,7 @@ Columns required for backtesting:
 from typing import List, Union
 import datetime
 import pandas as pd
-from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY
+from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY, DIVIDEND_AMT
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,8 +40,15 @@ def retrieve_price_data_from_yfin(tickers: List[str],
         assert data is not None, f"Failed to retrieve data for tickers: {chunk_tickers_str} between {start_date} and {end_date}" 
         
         # Data is still a multiindex with tickers as second level; get ticker to its own column and drop the multiindex
-        data = data.stack(level=1).reset_index()
-        data = data.rename(columns={'level_1': TICKER})
+        if len(tickers) > 1:
+            data = data.stack(level=1).reset_index()
+            data = data.rename(columns={'level_1': TICKER})
+        elif len(tickers) == 1:
+            data = data.reset_index()
+            data[TICKER] = tickers[0]
+        else:
+            raise NotImplementedError(f"Empty ticker list provided!")
+        
 
         assert {DATE, TICKER, PRICE, 'High', 'Low', 'Open', 'Volume'}.issubset(data.columns), \
             f"Missing required columns in data for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
@@ -59,6 +66,29 @@ def retrieve_price_data_from_yfin(tickers: List[str],
     data[DATE] = pd.to_datetime(data[DATE])
     data[TICKER] = data[TICKER].str.upper()
     return data
+
+
+def retrieve_dividend_info_from_yfin(tickers: List[str]) -> pd.DataFrame:
+    """Retrieves dividend information for the given tickers using Yahoo Finance API.
+    @return DataFrame with columns=['Date', 'DividendYield']"""
+    ...
+    
+    import yfinance as yf
+
+    all_info = []
+    for ticker in tickers:
+        info = yf.Ticker(ticker).dividends
+        assert info is not None, f"Failed to retrieve info for ticker: {ticker}"
+        if info.empty:
+            return
+
+        info = info.reset_index()
+        info[TICKER] = ticker
+        all_info.append(info)
+
+    all_info = pd.concat(all_info) if len(all_info) >= 1 else pd.DataFrame(columns=[DATE, DIVIDEND_AMT])
+    all_info[DATE] = pd.to_datetime(pd.to_datetime(all_info[DATE]).dt.date)
+    return all_info
 
 
 def retrieve_ticker_info_from_yfin(tickers: List[str], relevant_cols=None) -> pd.DataFrame:
@@ -124,6 +154,7 @@ def retrieve_data_from_yfin(tickers: List[str],
     """
     price_data = retrieve_price_data_from_yfin(tickers, start_date, end_date, chunk_size, auto_adjust=auto_adjust)
     ticker_info = retrieve_ticker_info_from_yfin(tickers)
+    div_data = retrieve_dividend_info_from_yfin(tickers)
     
     if any(ticker_info['symbol'].duplicated()):
         logger.warning("Duplicate symbols found in ticker info. This may lead to issues when merging with price data."
@@ -132,18 +163,12 @@ def retrieve_data_from_yfin(tickers: List[str],
 
     logger.info(f"Price data shape: {price_data.shape}")
     logger.info(f"Ticker info shape: {ticker_info.shape}")
+    logger.info(f"Dividend data shape: {div_data.shape}")
 
     # Merge price data with ticker info on 'Ticker' and 'symbol'
     merged_data = price_data.merge(ticker_info, left_on=TICKER, right_on='symbol', how='left')
+    merged_data = price_data.merge(div_data, how='left', on=[TICKER, DATE])
+    merged_data[DIVIDEND_AMT] = merged_data[DIVIDEND_AMT].fillna(0)
+
     logger.info(f"Merged data shape: {merged_data.shape}")
-    
     return merged_data
-
-
-if __name__ == "__main__":
-    tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN']
-    start_date = '2026-01-01'
-    end_date = '2026-01-10'
-    data = retrieve_data_from_yfin(tickers, start_date, end_date, auto_adjust=False)
-    import pprint
-    pprint.pprint(data.head())
