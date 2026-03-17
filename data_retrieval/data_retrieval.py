@@ -10,12 +10,15 @@ Columns required for backtesting:
 from typing import List, Union
 import datetime
 import pandas as pd
-from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY, DIVIDEND_AMT
 import logging
+
+from data_retrieval import forex
+from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY, DIVIDEND_AMT
 
 logger = logging.getLogger(__name__)
 
 
+@forex.convert_to_usd()
 def retrieve_price_data_from_yfin(tickers: List[str], 
                             start_date: Union[str, datetime.datetime], 
                             end_date: Union[str, datetime.datetime],
@@ -68,6 +71,7 @@ def retrieve_price_data_from_yfin(tickers: List[str],
     return data
 
 
+@forex.convert_to_usd()
 def retrieve_dividend_info_from_yfin(tickers: List[str]) -> pd.DataFrame:
     """Retrieves dividend information for the given tickers using Yahoo Finance API.
     @return DataFrame with columns=['Date', 'DividendYield']"""
@@ -91,6 +95,7 @@ def retrieve_dividend_info_from_yfin(tickers: List[str]) -> pd.DataFrame:
     return all_info
 
 
+@forex.convert_to_usd()
 def retrieve_ticker_info_from_yfin(tickers: List[str], relevant_cols=None) -> pd.DataFrame:
     """
     Retrieve ticker information for the given tickers using Yahoo Finance API.
