@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 def retrieve_price_data_from_yfin(tickers: List[str], 
                             start_date: Union[str, datetime.datetime], 
                             end_date: Union[str, datetime.datetime],
-                            chunk_size=50) -> pd.DataFrame:
+                            chunk_size=50, auto_adjust=True) -> pd.DataFrame:
     """
     Retrieve historical data for the given tickers and date range using Yahoo Finance API.
     @param tickers: List of stock tickers to retrieve data for.
@@ -35,7 +35,7 @@ def retrieve_price_data_from_yfin(tickers: List[str],
     for i in range(0, len(tickers), chunk_size):
         chunk_tickers = tickers[i:i + chunk_size]
         chunk_tickers_str = ' '.join(chunk_tickers)
-        data = yf.download(chunk_tickers_str, start=start_date, end=end_date, multi_level_index=False)
+        data = yf.download(chunk_tickers_str, start=start_date, end=end_date, multi_level_index=False, auto_adjust=auto_adjust)
         assert data is not None, f"Failed to retrieve data for tickers: {chunk_tickers_str} between {start_date} and {end_date}" 
         
         # Data is still a multiindex with tickers as second level; get ticker to its own column and drop the multiindex
@@ -44,6 +44,9 @@ def retrieve_price_data_from_yfin(tickers: List[str],
 
         assert {'Date', 'Ticker', 'Close', 'High', 'Low', 'Open', 'Volume'}.issubset(data.columns), \
             f"Missing required columns in data for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
+        
+        if not auto_adjust:
+            assert 'Adj Close' in data.columns, f"Adj Close column is required when auto_adjust=False for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
 
         logger.debug(f"Retrieved data for tickers: {chunk_tickers_str} between {start_date} and {end_date}, shape: {data.shape}")
 
@@ -51,6 +54,9 @@ def retrieve_price_data_from_yfin(tickers: List[str],
 
     if len(all_data) > 0:
         data = pd.concat(all_data, ignore_index=True)
+
+    data['Date'] = pd.to_datetime(data['Date'])
+    data['Ticker'] = data['Ticker'].str.upper()
     return data
 
 
@@ -103,17 +109,19 @@ def retrieve_ticker_info_from_yfin(tickers: List[str], relevant_cols=None) -> pd
 def retrieve_data_from_yfin(tickers: List[str], 
                             start_date: Union[str, datetime.datetime], 
                             end_date: Union[str, datetime.datetime],
-                            chunk_size=50) -> pd.DataFrame:
+                            chunk_size=50,
+                            auto_adjust=True) -> pd.DataFrame:
     """
     Retrieve both price data and ticker information for the given tickers and date range using Yahoo Finance API.
     @param tickers: List of stock tickers to retrieve data for.
     @param start_date: Start date for data retrieval.
     @param end_date: End date for data retrieval. (For yfinance this is exclusive.)
     @param chunk_size: Number of tickers to retrieve in each API call
+    @param auto_adjust: Whether to automatically adjust prices for corporate actions.
 
     @return: DataFrame with both price data and ticker information.
     """
-    price_data = retrieve_price_data_from_yfin(tickers, start_date, end_date, chunk_size)
+    price_data = retrieve_price_data_from_yfin(tickers, start_date, end_date, chunk_size, auto_adjust=auto_adjust)
     ticker_info = retrieve_ticker_info_from_yfin(tickers)
     
     if any(ticker_info['symbol'].duplicated()):
@@ -135,6 +143,6 @@ if __name__ == "__main__":
     tickers = ['AAPL', 'MSFT', 'NVDA', 'GOOGL', 'AMZN']
     start_date = '2026-01-01'
     end_date = '2026-01-10'
-    data = retrieve_data_from_yfin(tickers, start_date, end_date)
+    data = retrieve_data_from_yfin(tickers, start_date, end_date, auto_adjust=False)
     import pprint
     pprint.pprint(data.head())

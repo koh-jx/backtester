@@ -18,3 +18,10 @@ def add_bdays(start_date: datetime.datetime, days: int, holidays: list=None) -> 
     
 def add_bdays_now(days: int, holidays: list=None) -> datetime.datetime:
     return add_bdays(datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0), days, holidays)
+
+
+if __name__ == "__main__":
+    # Example usage
+    today = datetime.datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    print(f"Today: {today}")
+    print(f"5 business days from now: {add_bdays_now(5)}")
