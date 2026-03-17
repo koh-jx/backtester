@@ -10,6 +10,7 @@ Columns required for backtesting:
 from typing import List, Union
 import datetime
 import pandas as pd
+from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY
 import logging
 
 logger = logging.getLogger(__name__)
@@ -40,13 +41,13 @@ def retrieve_price_data_from_yfin(tickers: List[str],
         
         # Data is still a multiindex with tickers as second level; get ticker to its own column and drop the multiindex
         data = data.stack(level=1).reset_index()
-        data = data.rename(columns={'level_1': 'Ticker'})
+        data = data.rename(columns={'level_1': TICKER})
 
-        assert {'Date', 'Ticker', 'Close', 'High', 'Low', 'Open', 'Volume'}.issubset(data.columns), \
+        assert {DATE, TICKER, PRICE, 'High', 'Low', 'Open', 'Volume'}.issubset(data.columns), \
             f"Missing required columns in data for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
         
         if not auto_adjust:
-            assert 'Adj Close' in data.columns, f"Adj Close column is required when auto_adjust=False for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
+            assert ADJ_PRICE in data.columns, f"Adj Close column is required when auto_adjust=False for tickers: {chunk_tickers_str} between {start_date} and {end_date}"
 
         logger.debug(f"Retrieved data for tickers: {chunk_tickers_str} between {start_date} and {end_date}, shape: {data.shape}")
 
@@ -55,8 +56,8 @@ def retrieve_price_data_from_yfin(tickers: List[str],
     if len(all_data) > 0:
         data = pd.concat(all_data, ignore_index=True)
 
-    data['Date'] = pd.to_datetime(data['Date'])
-    data['Ticker'] = data['Ticker'].str.upper()
+    data[DATE] = pd.to_datetime(data[DATE])
+    data[TICKER] = data[TICKER].str.upper()
     return data
 
 
@@ -75,7 +76,7 @@ def retrieve_ticker_info_from_yfin(tickers: List[str], relevant_cols=None) -> pd
     """
 
     if relevant_cols is None:
-        relevant_cols = ['symbol', 'country', 'currency', 'longBusinessSummary', 'longName', 'sector', 'industry', 'industryKey',
+        relevant_cols = ['symbol', COUNTRY, 'currency', 'longBusinessSummary', 'longName', 'sector', 'industry', 'industryKey',
                          'ebitda', 'enterpriseValue', 'forwardPE', 'forwardEps', 'priceToBook',
                          'trailingPE', 'trailingEps', 'dividendYield', 'dividendRate', 'beta',
                          'returnOnAssets', 'returnOnEquity', 'grossMargins', 'operatingMargins',
@@ -133,7 +134,7 @@ def retrieve_data_from_yfin(tickers: List[str],
     logger.info(f"Ticker info shape: {ticker_info.shape}")
 
     # Merge price data with ticker info on 'Ticker' and 'symbol'
-    merged_data = price_data.merge(ticker_info, left_on='Ticker', right_on='symbol', how='left')
+    merged_data = price_data.merge(ticker_info, left_on=TICKER, right_on='symbol', how='left')
     logger.info(f"Merged data shape: {merged_data.shape}")
     
     return merged_data

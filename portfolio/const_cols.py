@@ -1,0 +1,7 @@
+WEIGHT = 'Weight'
+DOLLARS = 'Dollars'
+TICKER = 'Ticker'
+DATE = 'Date'
+PRICE = 'Close'
+ADJ_PRICE = 'Adj Close'
+COUNTRY = 'Country'

@@ -8,8 +8,8 @@ import logging
 
 from utils import utils_cal, utils_csv
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 logger.addHandler(logging.StreamHandler())
 
 
@@ -26,7 +26,7 @@ def preprocess(data: pd.DataFrame, start_date: str, end_date: str, buffer=5) -> 
     return data_with_returns
 
 
-def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str, end_date: str, buffer=5):
+def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str, end_date: str, buffer=5, export_to_csv=True) -> pd.DataFrame:
     
     portfolio_df = portf_gen.get_portfolio(source_portfolio)
     data_with_returns = preprocess(portfolio_df, start_date, end_date, buffer)
@@ -36,7 +36,10 @@ def run_backtest(source_portfolio: Union[List[str], str, Dict], start_date: str,
     data_with_returns['PnL'] = data_with_returns['Returns']
 
     result = data_with_returns[['Date', 'Ticker', 'Dollars', 'Returns', 'PnL']]
-    utils_csv.export_and_open_csv(result, 'backtest_output.csv')
+
+    if export_to_csv:
+        utils_csv.export_and_open_csv(result, 'backtest_output.csv')
+        
     return result
 
 
