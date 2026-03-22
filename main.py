@@ -3,7 +3,8 @@ import datetime as dt
 
 from portfolio import generate_portfolio_from_csv as portf_gen
 from btest import run_btest
-from portfolio.const_cols import TICKER, WEIGHT
+from visualisation import visualisation
+from portfolio.const_cols import TICKER, WEIGHT, PNL, DIVIDEND_PNL
 
 
 logging.basicConfig(level=logging.INFO)
@@ -18,13 +19,15 @@ if __name__ == "__main__":
 
     # Create portfolio
     portfolio_df = portf_gen.get_portfolio(source_portfolio)
-    start_date = dt.datetime(2026, 1, 1)
+    start_date = dt.datetime(2020, 1, 1)
     end_date = dt.datetime(2026, 3, 15)
 
     # TODO run portfolio on Strategy (adding the Date column)
 
     # Run backtest on portfolio df
-    run_btest.run_backtest(portfolio_df, start_date, end_date, export_to_csv=True)
+    output = run_btest.run_backtest(portfolio_df, start_date, end_date, export_to_csv=False)
+    visualisation.plot_portfolio(output, y_axis_col=[PNL, DIVIDEND_PNL], run_yearly=True)
+
 
 
 # if __name__ == "__main__":
