@@ -1,20 +1,42 @@
 import logging
+import datetime as dt
+
+from portfolio import generate_portfolio_from_csv as portf_gen
+from btest import run_btest
+from portfolio.const_cols import TICKER, WEIGHT
 
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
+
 if __name__ == "__main__":
-    # ticker = 'AAPL'
-    # import yfinance as yf
-    # aapl = yf.Ticker(ticker).info['country']
-    # print(aapl)
+    tickers = ['AAPL', 'O39.SI']
+    weights = [0.5, 0.5]
+    source_portfolio = {TICKER: tickers, WEIGHT: weights}
 
-    # import datetime
-    # from data_retrieval import forex
-    # print(forex.retrieve_exchange_rates(['Singapore'], datetime.datetime(2026, 1, 1), datetime.datetime(2026, 1, 30)))
+    # Create portfolio
+    portfolio_df = portf_gen.get_portfolio(source_portfolio)
+    start_date = dt.datetime(2026, 1, 1)
+    end_date = dt.datetime(2026, 3, 15)
 
-    import datetime
-    from data_retrieval import data_retrieval
-    print(data_retrieval.retrieve_price_data_from_yfin(['AAPL'], datetime.datetime(2026, 1, 1), datetime.datetime(2026, 1, 30)))
+    # TODO run portfolio on Strategy (adding the Date column)
+
+    # Run backtest on portfolio df
+    run_btest.run_backtest(portfolio_df, start_date, end_date, export_to_csv=True)
+
+
+# if __name__ == "__main__":
+#     # ticker = 'AAPL'
+#     # import yfinance as yf
+#     # aapl = yf.Ticker(ticker).info['country']
+#     # print(aapl)
+
+#     # import datetime
+#     # from data_retrieval import forex
+#     # print(forex.retrieve_exchange_rates(['Singapore'], datetime.datetime(2026, 1, 1), datetime.datetime(2026, 1, 30)))
+
+#     import datetime
+#     from data_retrieval import data_retrieval
+#     print(data_retrieval.retrieve_price_data_from_yfin(['AAPL'], datetime.datetime(2026, 1, 1), datetime.datetime(2026, 1, 30)))

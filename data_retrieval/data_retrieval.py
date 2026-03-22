@@ -12,7 +12,8 @@ import datetime
 import pandas as pd
 import logging
 
-from data_retrieval import forex
+from data_retrieval import forex, returns_adj
+from utils import utils_cal
 from portfolio.const_cols import TICKER, DATE, PRICE, ADJ_PRICE, COUNTRY, DIVIDEND_AMT
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ def retrieve_dividend_info_from_yfin(tickers: List[str]) -> pd.DataFrame:
         all_info.append(info)
 
     all_info = pd.concat(all_info) if len(all_info) >= 1 else pd.DataFrame(columns=[DATE, DIVIDEND_AMT])
-    all_info[DATE] = pd.to_datetime(pd.to_datetime(all_info[DATE]).dt.date)
+    all_info[DATE] = pd.to_datetime(pd.to_datetime(all_info[DATE], utc=True).dt.date)
     return all_info
 
 
@@ -177,3 +178,15 @@ def retrieve_data_from_yfin(tickers: List[str],
 
     logger.info(f"Merged data shape: {merged_data.shape}")
     return merged_data
+
+
+
+def preprocess_rets(all_tickers: List[str], start_date: str, end_date: str, buffer=5) -> pd.DataFrame:
+    # Retrieve price data for the tickers and date range
+    retrieval_start_date = utils_cal.add_bdays(start_date, -buffer)
+    retrieval_end_date = utils_cal.add_bdays(end_date, buffer)
+    data = retrieve_data_from_yfin(all_tickers, retrieval_start_date, retrieval_end_date)
+    data_with_returns = returns_adj.add_returns(data)
+
+    data_with_returns = data_with_returns.loc[data_with_returns[DATE].between(start_date, end_date)]
+    return data_with_returns
